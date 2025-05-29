@@ -3,92 +3,252 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Historique des courses</title>
+<title>Historique des Courses</title>
+
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+
 <style>
-  body, html { margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#fafafa; }
-  main {
-    max-width: 700px;
-    margin: 20px auto;
-    padding: 15px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+  body, html {
+    margin: 0; padding: 0; background: #000; color: #0ff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
   }
   h1 {
     text-align: center;
-    color: #007BFF;
+    padding: 0.5rem 0;
+    font-weight: 600;
   }
-  ul {
-    list-style: none;
-    padding: 0;
+  #courses-list {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 10px;
   }
-  li {
-    background: #e3eefd;
-    margin: 10px 0;
-    padding: 15px;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: background 0.3s ease;
+  .course-item {
+    background: #111;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 0 8px #0ff;
   }
-  li:hover {
-    background: #c7dbfb;
-  }
-  .date {
+  .course-header {
+    display: flex;
+    justify-content: space-between;
     font-weight: 700;
-    color: #004080;
+    margin-bottom: 6px;
   }
-  .details {
-    margin-top: 8px;
+  .course-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     font-size: 0.9rem;
-    color: #00264d;
+  }
+  .course-info div {
+    flex: 1 1 45%;
+  }
+  .mini-map {
+    height: 180px;
+    border-radius: 12px;
+    margin-top: 8px;
+    box-shadow: 0 0 10px #0ff;
+  }
+  .btn-share {
+    margin-top: 8px;
+    background: #0077cc;
+    border: none;
+    color: #0ff;
+    padding: 8px 16px;
+    border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 0 8px #0ff;
+    font-weight: 700;
+    width: 100%;
+  }
+  .btn-share:hover {
+    background: #00aaff;
+  }
+  /* Bouton retour */
+  #btn-back {
+    background: #0077cc;
+    border: none;
+    color: #0ff;
+    padding: 10px 20px;
+    margin: 10px auto 10px auto;
+    border-radius: 40px;
+    cursor: pointer;
+    box-shadow: 0 0 10px #0ff;
+    font-weight: 700;
+    max-width: 200px;
+  }
+  #btn-back:hover {
+    background: #00aaff;
+  }
+  /* Scrollbar personnalisée */
+  #courses-list::-webkit-scrollbar {
+    width: 8px;
+  }
+  #courses-list::-webkit-scrollbar-track {
+    background: #111;
+  }
+  #courses-list::-webkit-scrollbar-thumb {
+    background: #0ff;
+    border-radius: 4px;
   }
 </style>
 </head>
 <body>
 
-<main>
-  <h1>Historique de vos courses</h1>
-  <ul id="listeCourses"></ul>
-</main>
+<h1>Historique des Courses</h1>
+
+<div id="courses-list">
+  <!-- Les parcours seront injectés ici -->
+</div>
+
+<button id="btn-back">← Retour à la course</button>
 
 <script>
-  function msToTime(duration) {
-    let seconds = Math.floor((duration / 1000) % 60),
-        minutes = Math.floor((duration / (1000 * 60)) % 60),
-        hours = Math.floor(duration / (1000 * 60 * 60));
-    return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+  mapboxgl.accessToken = 'pk.eyJ1IjoiZ3ViaW5xIiwiYSI6ImNrbnlubnVwYjBsMjgyb3J4b3hqM2YwOGsifQ.KV-VZe4nIEMc7rhtHmM5BQ'; // Mets ton token ici !
+
+  const coursesList = document.getElementById('courses-list');
+  const btnBack = document.getElementById('btn-back');
+
+  // Charger les parcours depuis localStorage
+  let courses = JSON.parse(localStorage.getItem('courses')) || [];
+
+  function formatTime(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const h = Math.floor(totalSeconds / 3600).toString().padStart(2,'0');
+    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2,'0');
+    const s = (totalSeconds % 60).toString().padStart(2,'0');
+    return `${h}:${m}:${s}`;
   }
 
-  function afficherHistorique(){
-    const historiques = JSON.parse(localStorage.getItem('historiquesCourses') || '[]');
-    const ul = document.getElementById('listeCourses');
-    ul.innerHTML = '';
+  // Crée une mini carte Mapbox statique dans le conteneur donné avec les coordonnées du parcours
+  function createMiniMap(containerId, coordinates) {
+    const miniMap = new mapboxgl.Map({
+      container: containerId,
+      style: 'mapbox://styles/mapbox/dark-v11',
+      center: coordinates.length ? coordinates[0] : [2.3522, 48.8566],
+      zoom: 13,
+      interactive: false
+    });
 
-    if(historiques.length === 0){
-      ul.innerHTML = '<li>Aucun parcours enregistré</li>';
+    miniMap.on('load', () => {
+      miniMap.addSource('route', {
+        'type': 'geojson',
+        'data': {
+          'type': 'Feature',
+          'geometry': {
+            'type': 'LineString',
+            'coordinates': coordinates
+          }
+        }
+      });
+      miniMap.addLayer({
+        'id': 'route',
+        'type': 'line',
+        'source': 'route',
+        'layout': {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        'paint': {
+          'line-color': '#00aaff',
+          'line-width': 4
+        }
+      });
+
+      // Ajuster la vue pour tout montrer
+      const bounds = coordinates.reduce((b, coord) => b.extend(coord), new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+      miniMap.fitBounds(bounds, {padding: 20});
+    });
+
+    return miniMap;
+  }
+
+  // Générer un fichier GPX pour partage
+  function shareCourse(course) {
+    const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="ApplicationCourse" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk><name>Course du ${new Date(course.id).toLocaleString()}</name><trkseg>`;
+    const gpxFooter = `</trkseg></trk></gpx>`;
+    let gpxPoints = '';
+    for(const p of course.path) {
+      gpxPoints += `<trkpt lat="${p.lat}" lon="${p.lng}"></trkpt>`;
+    }
+    const gpxContent = gpxHeader + gpxPoints + gpxFooter;
+
+    const blob = new Blob([gpxContent], {type: 'application/gpx+xml'});
+    const url = URL.createObjectURL(blob);
+
+    // Utilisation Web Share API si dispo
+    if(navigator.share) {
+      navigator.share({
+        title: 'Parcours de course',
+        text: 'Voici mon parcours de course',
+        url: url
+      }).catch(() => alert('Partage annulé ou impossible'));
+    } else {
+      // Sinon propose de télécharger le fichier
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `course_${course.id}.gpx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert('Fichier GPX téléchargé. Vous pouvez le partager manuellement.');
+    }
+  }
+
+  function renderCourses() {
+    if(courses.length === 0){
+      coursesList.innerHTML = '<p>Aucun parcours enregistré.</p>';
       return;
     }
+    coursesList.innerHTML = '';
+    for(const course of courses) {
+      // Vérifier que course.id est un timestamp numérique (ou convertir)
+      let timestamp;
+      if(typeof course.id === 'number') timestamp = course.id;
+      else if(typeof course.id === 'string' && !isNaN(Number(course.id))) timestamp = Number(course.id);
+      else timestamp = Date.now(); // fallback
+      
+      const dateStr = new Date(timestamp).toLocaleString();
 
-    historiques.forEach(course => {
-      const li = document.createElement('li');
-      li.innerHTML = `
-        <div class="date">${new Date(course.date).toLocaleString()}</div>
-        <div class="details">
-          Distance: ${course.distance.toFixed(2)} km<br>
-          Durée: ${msToTime(course.duration)}<br>
-          Dénivelé: ${Math.round(course.denivele)} m<br>
-          Km-effort: ${course.kmeffort.toFixed(2)}
+      const div = document.createElement('div');
+      div.className = 'course-item';
+
+      div.innerHTML = `
+        <div class="course-header">
+          <div>Course du ${dateStr}</div>
+          <button class="btn-share">Partager</button>
         </div>
+        <div class="course-info">
+          <div>Durée: ${formatTime(course.duration)}</div>
+          <div>Distance: ${(course.distance/1000).toFixed(2)} km</div>
+          <div>Vitesse Moyenne: ${course.avgSpeed.toFixed(2)} km/h</div>
+          <div>Dénivelé: ${Math.round(course.elevationGain)} m</div>
+          <div>Km Effort: ${course.kmEffort.toFixed(2)}</div>
+        </div>
+        <div id="mini-map-${course.id}" class="mini-map"></div>
       `;
-      li.addEventListener('click', () => {
-        sessionStorage.setItem('dernierParcours', JSON.stringify(course));
-        window.location.href = 'fin.html';
-      });
-      ul.appendChild(li);
-    });
+
+      coursesList.appendChild(div);
+
+      // Initialiser mini carte
+      createMiniMap(`mini-map-${course.id}`, course.path.map(p => [p.lng, p.lat]));
+
+      // Bouton partage
+      const shareBtn = div.querySelector('.btn-share');
+      shareBtn.onclick = () => shareCourse(course);
+    }
   }
 
-  afficherHistorique();
+  btnBack.onclick = () => {
+    window.location.href = 'index.html';
+  };
+
+  renderCourses();
 </script>
 
 </body>
