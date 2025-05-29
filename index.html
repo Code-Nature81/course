@@ -1,405 +1,487 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Application de Course</title>
-  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
-  <style>
-    body, html {
-      margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f5f7fa;
-    }
-    #map {
-      flex: 1;
-      position: relative;
-    }
-    #controls {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 10px;
-      background: #fff;
-      box-shadow: 0 -2px 6px rgba(0,0,0,0.1);
-    }
-    button {
-      cursor: pointer;
-      border: none;
-      background: #007BFF;
-      color: white;
-      font-size: 16px;
-      padding: 10px 20px;
-      margin: 0 10px;
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Course - Tracker</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+<style>
+  /* Style moderne minimaliste */
+  body, html {
+    margin: 0; padding: 0; height: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #121212;
+    color: #eee;
+    display: flex; flex-direction: column;
+  }
+  #map {
+    flex: 1;
+    min-height: 300px;
+  }
+  header {
+    padding: 1rem;
+    background: #1e1e1e;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.4rem;
+    color: #38a1db;
+  }
+  .stats {
+    display: flex;
+    justify-content: space-around;
+    background: #222;
+    padding: 1rem 0;
+    font-size: 1.1rem;
+  }
+  .btn-container {
+    text-align: center;
+    margin: 1rem 0;
+  }
+  button {
+    margin: 0 0.5rem;
+    padding: 0.7rem 1.5rem;
+    font-size: 1.2rem;
+    background: #38a1db;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  button:hover {
+    background: #2691d9;
+  }
+  #startStopBtn {
+    background: #28a745;
+  }
+  #startStopBtn.running {
+    background: #dc3545;
+  }
+
+   #styleSelector {
+      background: #1e1e1e;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 0.5rem;
       border-radius: 8px;
-      transition: background 0.3s ease;
+      font-size: 1rem;
     }
-    button:hover {
-      background: #0056b3;
-    }
-    #startStop {
+    /* Bouton GPS */
+    #locateBtn {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 10;
-      background: #007BFF;
-      border-radius: 50%;
-      width: 80px;
-      height: 80px;
-      font-size: 20px;
-      font-weight: bold;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      color: white;
-      box-shadow: 0 4px 10px rgba(0,123,255,0.5);
-      user-select: none;
-    }
-    #stats {
-      background: white;
-      padding: 10px 20px;
-      font-size: 16px;
-      color: #333;
-      display: flex;
-      justify-content: space-around;
-      box-shadow: 0 -2px 6px rgba(0,0,0,0.1);
-      font-weight: 600;
-    }
-    #geolocBtn {
-      position: absolute;
-      top: 10px;
+      top: 80px;
       right: 10px;
-      background: white;
+      z-index: 100;
+      background: #38a1db;
+      color: white;
+      border: none;
+      padding: 10px;
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      border: 2px solid #007BFF;
-      display: flex;
-      justify-content: center;
-      align-items: center;
       cursor: pointer;
-      z-index: 15;
-      box-shadow: 0 2px 6px rgba(0,123,255,0.3);
     }
-    #geolocBtn:hover {
-      background: #e6f0ff;
-    }
-    /* Cercle bleu autour de la position */
-    .geoloc-circle {
-      width: 100px;
-      height: 100px;
-      border: 3px solid #007BFF;
-      border-radius: 50%;
-      position: absolute;
-      pointer-events: none;
-      animation: pulse 2s infinite;
-      opacity: 0.4;
-      z-index: 14;
-    }
-    @keyframes pulse {
-      0% {transform: scale(1); opacity: 0.4;}
-      50% {transform: scale(1.4); opacity: 0;}
-      100% {transform: scale(1); opacity: 0.4;}
-    }
-  </style>
+
+  /* Style modal Historique */
+  #historyModal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85);
+    overflow-y: auto;
+    padding: 2rem;
+  }
+  #historyModal.active {
+    display: block;
+  }
+  #historyContent {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #1e1e1e;
+    border-radius: 10px;
+    padding: 1rem;
+    color: #eee;
+  }
+  #historyContent h2 {
+    text-align: center;
+    margin-bottom: 1rem;
+    color: #38a1db;
+  }
+  .run-item {
+    background: #282828;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    padding: 0.8rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+  }
+  .run-info {
+    flex: 1 1 200px;
+    min-width: 200px;
+  }
+  .run-info div {
+    margin-bottom: 0.3rem;
+  }
+  .mini-map {
+    width: 250px;
+    height: 150px;
+    border-radius: 6px;
+    flex: 0 0 250px;
+    background: #000;
+  }
+  #closeHistoryBtn {
+    display: block;
+    margin: 0 auto 1rem auto;
+    background: #dc3545;
+  }
+</style>
 </head>
 <body>
+<header>Course-app</header>
 
+<button id="locateBtn" title="Me localiser">📍</button>
+
+<!-- Menu pour changer le fond de carte -->
+<div style="text-align:center; margin: 0.5rem;">
+  <select id="styleSelector">
+    <option value="mapbox://styles/mapbox/outdoors-v12">Outdoors</option>
+    <option value="mapbox://styles/mapbox/satellite-streets-v12">Satellite</option>
+    <option value="mapbox://styles/mapbox/streets-v12">Streets</option>
+    <option value="mapbox://styles/mapbox/dark-v11">Dark</option>
+  </select>
+</div>
 <div id="map"></div>
-
-<div id="startStop">START</div>
-<div id="geolocBtn" title="Me géolocaliser">&#128269;</div>
-
-<div id="stats" style="display:none;">
-  <div>Temps: <span id="chrono">00:00:00</span></div>
-  <div>Distance: <span id="distance">0.00</span> km</div>
-  <div>Dénivelé: <span id="denivele">0</span> m</div>
-  <div>Km-effort: <span id="kmeffort">0.00</span></div>
+<div class="stats">
+  <div>Distance : <br><span id="distance">0</span> km</div>
+  <div>Dénivelé : <br><span id="elevation">0</span> m</div>
+  <div>Km-effort : <br><span id="kmEffort">0</span></div>
+  <div>Temps : <br><span id="time">00:00:00</span></div>
+</div>
+<div class="btn-container">
+  <button id="startStopBtn">Démarrer la course</button>
+  <button id="historyBtn">Historique</button>
 </div>
 
-<div id="historiqueBtnContainer" style="text-align:center; margin:10px;">
-  <button id="btnHistorique">Historique</button>
+<!-- Modal Historique -->
+<div id="historyModal">
+  <div id="historyContent">
+    <h2>Historique des courses</h2>
+    <button id="closeHistoryBtn">Fermer</button>
+    <div id="runsList">
+      <!-- Courses enregistrées ici -->
+    </div>
+  </div>
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
 <script>
-  mapboxgl.accessToken = 'TA_CLE_MAPBOX_ICI'; // Remplace par ta clé
+  mapboxgl.accessToken = 'pk.eyJ1IjoiZ3ViaW5xIiwiYSI6ImNrbnlubnVwYjBsMjgyb3J4b3hqM2YwOGsifQ.KV-VZe4nIEMc7rhtHmM5BQ';
 
   let map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/mapbox/outdoors-v12',
-    center: [2.3522, 48.8566], // Paris par défaut
-    zoom: 12
+    center: [2.3522, 48.8566],
+    zoom: 13
   });
 
-  // Différents styles de fond
-  const styles = {
-    outdoors: 'mapbox://styles/mapbox/outdoors-v12',
-    satellite: 'mapbox://styles/mapbox/satellite-v9',
-    streets: 'mapbox://styles/mapbox/streets-v12',
-    light: 'mapbox://styles/mapbox/light-v11'
-  };
-
-  // Ajouter un control style switcher simple
-  const styleSelector = document.createElement('select');
-  styleSelector.style.position = 'absolute';
-  styleSelector.style.top = '10px';
-  styleSelector.style.left = '10px';
-  styleSelector.style.zIndex = '15';
-  styleSelector.style.padding = '5px';
-  for(let key in styles){
-    let option = document.createElement('option');
-    option.value = styles[key];
-    option.textContent = key.charAt(0).toUpperCase() + key.slice(1);
-    styleSelector.appendChild(option);
+  // Fonction pour centrer la carte sur l'utilisateur
+document.getElementById('locateBtn').addEventListener('click', () => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        map.flyTo({ center: [longitude, latitude], zoom: 15 });
+        new mapboxgl.Marker({ color: '#38a1db' })
+          .setLngLat([longitude, latitude])
+          .addTo(map);
+      },
+      (error) => {
+        alert("Impossible d'obtenir la position actuelle.");
+        console.error(error);
+      },
+      { enableHighAccuracy: true }
+    );
+  } else {
+    alert("Géolocalisation non supportée.");
   }
-  styleSelector.addEventListener('change', (e) => {
-    map.setStyle(e.target.value);
-  });
-  document.body.appendChild(styleSelector);
+});
 
-  // Variables course
-  let running = false;
-  let path = [];
-  let watchId = null;
-  let startTime = 0;
-  let timerInterval = null;
-  let distance = 0;
-  let denivele = 0;
-  let lastAltitude = null;
-  let kmeffort = 0;
+// Changer le fond de carte
+document.getElementById('styleSelector').addEventListener('change', (e) => {
+  map.setStyle(e.target.value);
+});
 
-  const startStopBtn = document.getElementById('startStop');
-  const chronoEl = document.getElementById('chrono');
+
+  let isRunning = false;
+  let watchId;
+  let positions = [];
+  let startTime, elapsedTimeInterval;
+  let elevationTotal = 0;
+
   const distanceEl = document.getElementById('distance');
-  const deniveleEl = document.getElementById('denivele');
-  const kmeffortEl = document.getElementById('kmeffort');
-  const statsEl = document.getElementById('stats');
-  const geolocBtn = document.getElementById('geolocBtn');
+  const elevationEl = document.getElementById('elevation');
+  const kmEffortEl = document.getElementById('kmEffort');
+  const timeEl = document.getElementById('time');
+  const startStopBtn = document.getElementById('startStopBtn');
 
-  // Cercle bleu de géoloc
-  let geolocCircle = null;
+  const historyBtn = document.getElementById('historyBtn');
+  const historyModal = document.getElementById('historyModal');
+  const runsList = document.getElementById('runsList');
+  const closeHistoryBtn = document.getElementById('closeHistoryBtn');
 
-  // Fonction pour formater la durée en hh:mm:ss
   function formatTime(ms) {
     let totalSeconds = Math.floor(ms / 1000);
-    let h = Math.floor(totalSeconds / 3600);
-    let m = Math.floor((totalSeconds % 3600) / 60);
-    let s = totalSeconds % 60;
-    return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+    let h = String(Math.floor(totalSeconds / 3600)).padStart(2,'0');
+    let m = String(Math.floor((totalSeconds % 3600)/60)).padStart(2,'0');
+    let s = String(totalSeconds % 60).padStart(2,'0');
+    return `${h}:${m}:${s}`;
   }
 
-  // Calcul distance en km entre 2 points [lng, lat]
-  function calcDistance(coord1, coord2){
-    const R = 6371e3; // m
-    const toRad = (deg) => deg * Math.PI / 180;
-    let lat1 = toRad(coord1[1]);
-    let lat2 = toRad(coord2[1]);
-    let dLat = lat2 - lat1;
-    let dLon = toRad(coord2[0] - coord1[0]);
+  function calculateDistance(coord1, coord2) {
+    const R = 6371e3;
+    const lat1 = coord1.latitude * Math.PI/180;
+    const lat2 = coord2.latitude * Math.PI/180;
+    const dLat = (coord2.latitude - coord1.latitude) * Math.PI/180;
+    const dLon = (coord2.longitude - coord1.longitude) * Math.PI/180;
 
-    let a = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
-    let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return (R * c)/1000; // km
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1)*Math.cos(lat2)*
+              Math.sin(dLon/2)*Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c;
   }
 
-  // Met à jour les stats km-effort simple = distance * (1 + dénivelé / 1000)
-  function majKmEffort(dist, deniv){
-    return dist * (1 + deniv / 1000);
-  }
+  function updateStats() {
+    if (positions.length < 2) return;
 
-  // Fonction pour créer cercle bleu géoloc
-  function ajouterCercleGeoloc(lngLat){
-    if(geolocCircle) geolocCircle.remove();
-    geolocCircle = document.createElement('div');
-    geolocCircle.className = 'geoloc-circle';
-    // Convertir coordonnées lngLat en pixels sur la carte
-    let pixel = map.project(lngLat);
-    geolocCircle.style.left = (pixel.x - 50) + 'px';
-    geolocCircle.style.top = (pixel.y - 50) + 'px';
-    geolocCircle.style.position = 'absolute';
-    geolocCircle.style.zIndex = '10';
-    document.getElementById('map').appendChild(geolocCircle);
-  }
-
-  // Met à jour position cercle lors du mouvement de la carte
-  map.on('move', () => {
-    if(geolocCircle && path.length){
-      let lastCoord = path[path.length - 1];
-      let pixel = map.project(lastCoord);
-      geolocCircle.style.left = (pixel.x - 50) + 'px';
-      geolocCircle.style.top = (pixel.y - 50) + 'px';
+    let totalDist = 0;
+    for(let i=1; i<positions.length; i++) {
+      totalDist += calculateDistance(positions[i-1], positions[i]);
     }
-  });
+    let distKm = (totalDist / 1000).toFixed(2);
+    distanceEl.textContent = distKm;
 
-  // Fonction démarrage course
-  function startCourse(){
-    running = true;
-    startTime = Date.now();
-    path = [];
-    distance = 0;
-    denivele = 0;
-    lastAltitude = null;
-    kmeffort = 0;
-    statsEl.style.display = 'flex';
-    startStopBtn.textContent = 'STOP';
-
-    // Supprimer ancien tracé si existant
-    if(map.getSource('path')){
-      map.removeLayer('pathLine');
-      map.removeSource('path');
+    elevationTotal = 0;
+    for(let i=1; i<positions.length; i++) {
+      let diff = positions[i].altitude - positions[i-1].altitude;
+      if(diff > 0) elevationTotal += diff;
     }
+    elevationEl.textContent = Math.round(elevationTotal);
 
-    watchId = navigator.geolocation.watchPosition(position => {
-      const {latitude, longitude, altitude} = position.coords;
-      const coord = [longitude, latitude];
-      path.push(coord);
-
-      // Ajout ou mise à jour cercle bleu géoloc
-      ajouterCercleGeoloc(coord);
-
-      // Centre carte sur position
-      map.easeTo({center: coord});
-
-      // Calcul distance
-      if(path.length > 1){
-        distance += calcDistance(path[path.length-2], path[path.length-1]);
-      }
-
-      // Calcul dénivelé
-      if(lastAltitude !== null && altitude !== null){
-        let diffAlt = altitude - lastAltitude;
-        if(diffAlt > 0) denivele += diffAlt; // on ne compte que les montées
-      }
-      lastAltitude = altitude;
-
-      // Calcul km-effort
-      kmeffort = majKmEffort(distance, denivele);
-
-      // Affichage
-      distanceEl.textContent = distance.toFixed(2);
-      deniveleEl.textContent = Math.round(denivele);
-      kmeffortEl.textContent = kmeffort.toFixed(2);
-
-      // Tracé ligne sur la carte
-      if(map.getSource('path')){
-        map.getSource('path').setData({
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: path
-          }
-        });
-      } else {
-        map.addSource('path', {
-          type: 'geojson',
-          data: {
-            type: 'Feature',
-            geometry: {
-              type: 'LineString',
-              coordinates: path
-            }
-          }
-        });
-        map.addLayer({
-          id: 'pathLine',
-          type: 'line',
-          source: 'path',
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': '#007BFF',
-            'line-width': 5
-          }
-        });
-      }
-    }, err => {
-      alert('Erreur de géolocalisation : ' + err.message);
-      stopCourse();
-    }, {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 10000
-    });
-
-    // Lancer chrono
-    timerInterval = setInterval(() => {
-      let elapsed = Date.now() - startTime;
-      chronoEl.textContent = formatTime(elapsed);
-    }, 1000);
+    let kmEffort = distKm * (1 + elevationTotal / 100);
+    kmEffortEl.textContent = kmEffort.toFixed(2);
   }
 
-  // Fonction arrêt course
-  function stopCourse(){
-    running = false;
-    startStopBtn.textContent = 'START';
-    statsEl.style.display = 'none';
-
-    if(watchId !== null){
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
-    }
-
-    clearInterval(timerInterval);
-    timerInterval = null;
-
-    // Enregistrer parcours dans le localStorage
-    enregistrerParcours({
-      date: new Date().toISOString(),
-      duration: Date.now() - startTime,
-      distance: distance,
-      denivele: denivele,
-      kmeffort: kmeffort,
-      path: path
-    });
-  }
-
-  // Fonction toggle start/stop
-  startStopBtn.addEventListener('click', () => {
-    if(!running){
-      startCourse();
+  function drawPath() {
+    if (map.getSource('route')) {
+      map.getSource('route').setData({
+        "type": "Feature",
+        "geometry": {
+          "type": "LineString",
+          "coordinates": positions.map(p => [p.longitude, p.latitude])
+        }
+      });
     } else {
-      stopCourse();
+      map.addSource('route', {
+        "type": "geojson",
+        "data": {
+          "type": "Feature",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": positions.map(p => [p.longitude, p.latitude])
+          }
+        }
+      });
+      map.addLayer({
+        "id": "route",
+        "type": "line",
+        "source": "route",
+        "layout": {
+          "line-join": "round",
+          "line-cap": "round"
+        },
+        "paint": {
+          "line-color": "#38a1db",
+          "line-width": 5
+        }
+      });
     }
-  });
-
-  // Fonction géolocalisation simple au clic sur bouton bleu
-  geolocBtn.addEventListener('click', () => {
-    navigator.geolocation.getCurrentPosition(position => {
-      const {longitude, latitude} = position.coords;
-      map.easeTo({center: [longitude, latitude], zoom: 15});
-    }, err => {
-      alert('Erreur géolocalisation : ' + err.message);
-    }, {enableHighAccuracy: true});
-  });
-
-  // Fonction enregistrer parcours dans localStorage
-  function enregistrerParcours(parcours){
-    let historiques = JSON.parse(localStorage.getItem('historiques')) || [];
-    historiques.push(parcours);
-    localStorage.setItem('historiques', JSON.stringify(historiques));
-    alert('Parcours enregistré !');
   }
 
-  // Fonction afficher dernier parcours dans console (exemple simple)
-  function afficherDernierParcours(){
-    let historiques = JSON.parse(localStorage.getItem('historiques')) || [];
-    if(historiques.length === 0){
-      alert('Aucun parcours enregistré.');
+  function updateTime() {
+    const now = Date.now();
+    const elapsed = now - startTime;
+    timeEl.textContent = formatTime(elapsed);
+  }
+
+  function saveRun() {
+    let runs = JSON.parse(localStorage.getItem('runs') || '[]');
+    const runData = {
+      id: Date.now(),
+      date: new Date().toISOString(),
+      positions,
+      distance: parseFloat(distanceEl.textContent),
+      elevation: elevationTotal,
+      kmEffort: parseFloat(kmEffortEl.textContent),
+      durationMs: Date.now() - startTime
+    };
+    runs.push(runData);
+    localStorage.setItem('runs', JSON.stringify(runs));
+  }
+
+  function startRun() {
+    if (!navigator.geolocation) {
+      alert('Géolocalisation non supportée par votre navigateur.');
       return;
     }
-    const dernier = historiques[historiques.length - 1];
-    let msg = `Dernier parcours :\nDate : ${new Date(dernier.date).toLocaleString()}\nDurée : ${formatTime(dernier.duration)}\nDistance : ${dernier.distance.toFixed(2)} km\nDénivelé : ${Math.round(dernier.denivele)} m\nKm-effort : ${dernier.kmeffort.toFixed(2)}\nPoints GPS : ${dernier.path.length}`;
-    alert(msg);
-    // Ici tu peux ajouter un affichage plus graphique (tracé etc.) dans une autre page
+    isRunning = true;
+    startStopBtn.textContent = 'Arrêter la course';
+    startStopBtn.classList.add('running');
+    positions = [];
+    elevationTotal = 0;
+    distanceEl.textContent = '0';
+    elevationEl.textContent = '0';
+    kmEffortEl.textContent = '0';
+    timeEl.textContent = '00:00:00';
+
+    startTime = Date.now();
+    elapsedTimeInterval = setInterval(updateTime, 1000);
+
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const coords = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          altitude: pos.coords.altitude || 0,
+          timestamp: pos.timestamp
+        };
+        positions.push(coords);
+
+        map.flyTo({center: [coords.longitude, coords.latitude], zoom: 15});
+
+        updateStats();
+        drawPath();
+      },
+      (err) => {
+        console.error('Erreur géoloc :', err);
+      },
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+    );
   }
 
-  // Bouton historique
-  document.getElementById('btnHistorique').addEventListener('click', afficherDernierParcours);
+  function stopRun() {
+    isRunning = false;
+    startStopBtn.textContent = 'Démarrer la course';
+    startStopBtn.classList.remove('running');
+    clearInterval(elapsedTimeInterval);
+    if(watchId) navigator.geolocation.clearWatch(watchId);
+    if(positions.length > 1) {
+      saveRun();
+      // Ici on pourrait afficher un résumé ou rediriger vers fin.html
+      alert('Course enregistrée dans l\'historique.');
+    } else {
+      alert('Parcours trop court, aucun enregistrement effectué.');
+    }
+  }
 
+  startStopBtn.addEventListener('click', () => {
+    if (isRunning) {
+      stopRun();
+    } else {
+      startRun();
+    }
+  });
+
+  // Historique - gestion modal
+  historyBtn.addEventListener('click', () => {
+    showHistory();
+  });
+  closeHistoryBtn.addEventListener('click', () => {
+    historyModal.classList.remove('active');
+    // Nettoyer maps miniatures
+    runsList.innerHTML = '';
+  });
+
+  // Afficher l'historique
+  function showHistory() {
+    runsList.innerHTML = '';
+    let runs = JSON.parse(localStorage.getItem('runs') || '[]');
+    if (runs.length === 0) {
+      runsList.innerHTML = '<p>Aucune course enregistrée.</p>';
+    } else {
+      // Trier par date décroissante
+      runs.sort((a,b) => b.id - a.id);
+      runs.forEach(run => {
+        const runDiv = document.createElement('div');
+        runDiv.classList.add('run-item');
+
+        // Infos textuelles
+        const infoDiv = document.createElement('div');
+        infoDiv.classList.add('run-info');
+        infoDiv.innerHTML = `
+          <div><strong>Date :</strong> ${new Date(run.date).toLocaleString()}</div>
+          <div><strong>Distance :</strong> ${run.distance.toFixed(2)} km</div>
+          <div><strong>Dénivelé :</strong> ${Math.round(run.elevation)} m</div>
+          <div><strong>Km-effort :</strong> ${run.kmEffort.toFixed(2)}</div>
+          <div><strong>Durée :</strong> ${formatTime(run.durationMs)}</div>
+        `;
+
+        // Mini carte Mapbox
+        const miniMapDiv = document.createElement('div');
+        miniMapDiv.classList.add('mini-map');
+        runDiv.appendChild(infoDiv);
+        runDiv.appendChild(miniMapDiv);
+
+        runsList.appendChild(runDiv);
+
+        // Initialiser mini map avec parcours
+        const miniMap = new mapboxgl.Map({
+          container: miniMapDiv,
+          style: 'mapbox://styles/mapbox/outdoors-v12',
+          interactive: false,
+          center: [run.positions[0].longitude, run.positions[0].latitude],
+          zoom: 13,
+          attributionControl: false
+        });
+
+        miniMap.on('load', () => {
+          miniMap.addSource('route', {
+            "type": "geojson",
+            "data": {
+              "type": "Feature",
+              "geometry": {
+                "type": "LineString",
+                "coordinates": run.positions.map(p => [p.longitude, p.latitude])
+              }
+            }
+          });
+          miniMap.addLayer({
+            "id": "route",
+            "type": "line",
+            "source": "route",
+            "layout": {
+              "line-join": "round",
+              "line-cap": "round"
+            },
+            "paint": {
+              "line-color": "#38a1db",
+              "line-width": 4
+            }
+          });
+
+          // Ajuster la vue au tracé
+          const bounds = run.positions.reduce((bounds, p) => {
+            return bounds.extend([p.longitude, p.latitude]);
+          }, new mapboxgl.LngLatBounds([run.positions[0].longitude, run.positions[0].latitude], [run.positions[0].longitude, run.positions[0].latitude]));
+
+          miniMap.fitBounds(bounds, {padding: 20});
+        });
+      });
+    }
+    historyModal.classList.add('active');
+  }
 </script>
 </body>
 </html>
-
