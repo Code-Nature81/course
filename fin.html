@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Récapitulatif de la course</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+<style>
+  body, html { margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f5f7fa; }
+  #map { height: 50vh; width: 100%; }
+  main {
+    max-width: 600px;
+    margin: 15px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+  }
+  h1 { text-align: center; color: #007BFF; }
+  .data-list {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 20px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #003366;
+  }
+  .data-list div {
+    background: #e3eefd;
+    padding: 10px 15px;
+    border-radius: 10px;
+    flex: 1 1 120px;
+    margin: 0 8px;
+    text-align: center;
+  }
+  button {
+    display: block;
+    margin: 25px auto 0;
+    padding: 12px 28px;
+    font-size: 1.2rem;
+    border: none;
+    border-radius: 30px;
+    background: #007BFF;
+    color: white;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  button:hover {
+    background: #0056b3;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <h1>Votre parcours</h1>
+  <div id="map"></div>
+  <div class="data-list">
+    <div>Durée : <span id="duree">00:00:00</span></div>
+    <div>Distance : <span id="distance">0.00</span> km</div>
+    <div>Dénivelé : <span id="denivele">0</span> m</div>
+    <div>Km-Effort : <span id="kmeffort">0.00</span></div>
+  </div>
+  <button id="btnRetour">Nouvelle course</button>
+  <button id="btnPartager">Partager ce parcours</button>
+</main>
+
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+<script>
+  mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
+
+  function msToTime(duration) {
+    let seconds = Math.floor((duration / 1000) % 60),
+        minutes = Math.floor((duration / (1000 * 60)) % 60),
+        hours = Math.floor(duration / (1000 * 60 * 60));
+    return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+  }
+
+  const parcours = JSON.parse(sessionStorage.getItem('dernierParcours'));
+  if(!parcours){
+    alert('Aucun parcours trouvé, retour à l\'accueil');
+    window.location.href = 'index.html';
+  }
+
+  const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/streets-v12',
+    center: parcours.path[0],
+    zoom: 14
+  });
+
+  map.on('load', () => {
+    map.addSource('path', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: parcours.path
+        }
+      }
+    });
+    map.addLayer({
+      id: 'pathLine',
+      type: 'line',
+      source: 'path',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#007BFF', 'line-width': 4 }
+    });
+
+    // Marker debut et fin
+    new mapboxgl.Marker({color:'#007BFF'}).setLngLat(parcours.path[0]).addTo(map);
+    new mapboxgl.Marker({color:'#FF0000'}).setLngLat(parcours.path[parcours.path.length-1]).addTo(map);
+  });
+
+  document.getElementById('duree').textContent = msToTime(parcours.duration);
+  document.getElementById('distance').textContent = parcours.distance.toFixed(2);
+  document.getElementById('denivele').textContent = Math.round(parcours.denivele);
+  document.getElementById('kmeffort').textContent = parcours.kmeffort.toFixed(2);
+
+  document.getElementById('btnRetour').addEventListener('click', () => {
+    sessionStorage.removeItem('dernierParcours');
+    window.location.href = 'index.html';
+  });
+
+  // Partage du parcours (texte + lien Google Maps approximatif)
+  document.getElementById('btnPartager').addEventListener('click', () => {
+    const start = parcours.path[0];
+    const end = parcours.path[parcours.path.length -1];
+    const shareText = `J'ai fait une course de ${parcours.distance.toFixed(2)} km en ${msToTime(parcours.duration)} avec ${Math.round(parcours.denivele)} m de dénivelé. Km-effort : ${parcours.kmeffort.toFixed(2)}.`;
+    const mapsUrl = `https://www.google.com/maps/dir/${start[1]},${start[0]}/${end[1]},${end[0]}`;
+
+    if(navigator.share){
+      navigator.share({
+        title: 'Mon parcours de course',
+        text: shareText,
+        url: mapsUrl
+      }).catch(err => alert('Erreur de partage: ' + err));
+    } else {
+      prompt('Copiez ce texte et partagez-le:', shareText + '\n' + mapsUrl);
+    }
+  });
+</script>
+
+</body>
+</html>

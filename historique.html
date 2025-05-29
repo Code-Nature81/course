@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Historique des courses</title>
+<style>
+  body, html { margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#fafafa; }
+  main {
+    max-width: 700px;
+    margin: 20px auto;
+    padding: 15px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+  }
+  h1 {
+    text-align: center;
+    color: #007BFF;
+  }
+  ul {
+    list-style: none;
+    padding: 0;
+  }
+  li {
+    background: #e3eefd;
+    margin: 10px 0;
+    padding: 15px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  li:hover {
+    background: #c7dbfb;
+  }
+  .date {
+    font-weight: 700;
+    color: #004080;
+  }
+  .details {
+    margin-top: 8px;
+    font-size: 0.9rem;
+    color: #00264d;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <h1>Historique de vos courses</h1>
+  <ul id="listeCourses"></ul>
+</main>
+
+<script>
+  function msToTime(duration) {
+    let seconds = Math.floor((duration / 1000) % 60),
+        minutes = Math.floor((duration / (1000 * 60)) % 60),
+        hours = Math.floor(duration / (1000 * 60 * 60));
+    return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+  }
+
+  function afficherHistorique(){
+    const histos = JSON.parse(localStorage.getItem('historiquesCourses') || '[]');
+    const ul = document.getElementById('listeCourses');
+    ul.innerHTML = '';
+
+    if(histos.length === 0){
+      ul.innerHTML = '<li>Aucun parcours enregistré</li>';
+      return;
+    }
+
+    histos.forEach(course => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <div class="date">${new Date(course.date).toLocaleString()}</div>
+        <div class="details">
+          Distance: ${course.distance.toFixed(2)} km<br>
+          Durée: ${msToTime(course.duration)}<br>
+          Dénivelé: ${Math.round(course.denivele)} m<br>
+          Km-effort: ${course.kmeffort.toFixed(2)}
+        </div>
+      `;
+      li.addEventListener('click', () => {
+        sessionStorage.setItem('dernierParcours', JSON.stringify(course));
+        window.location.href = 'fin.html';
+      });
+      ul.appendChild(li);
+    });
+  }
+
+  afficherHistorique();
+</script>
+
+</body>
+</html>
