@@ -26,6 +26,7 @@
   #map-container {
     position: relative;
     flex: 1 1 auto;
+    min-height: 300px; /* par exemple */
   }
   #map {
     position: absolute;
@@ -142,6 +143,14 @@
       margin: 0;
       width: 100%;
     }
+    #btn-geoloc {
+    width: auto !important; /* pour annuler width: 100% */
+    flex: none !important;   /* pour annuler flex: 1 */
+    padding: 10px; 
+            
+  }
+
+    
   }
 </style>
 </head>
