@@ -14,6 +14,15 @@
     color: #eee;
     display: flex; flex-direction: column;
   }
+
+  .point-bleu {
+    width: 12px;
+    height: 12px;
+    background-color: #007aff;
+    border: 2px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(0,122,255,0.7);
+  }
   #map {
     flex: 1;
     min-height: 300px;
@@ -162,6 +171,24 @@
   <button id="startStopBtn">Démarrer la course</button>
   <button id="historyBtn">Historique</button>
 </div>
+<div id="wakeLockMessage" style="
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 15px 25px;
+  border-radius: 10px;
+  font-size: 16px;
+  text-align: center;
+  z-index: 1000;
+  max-width: 90%;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+">
+  ℹ️ Veuillez ne pas verrouiller votre téléphone et garder cette application ouverte pour continuer le suivi en temps réel.
+</div>
+
 
 <!-- Modal Historique -->
 <div id="historyModal">
@@ -184,6 +211,39 @@
     center: [2.3522, 48.8566],
     zoom: 13
   });
+
+   // Création de l'élément point bleu
+  const el = document.createElement('div');
+  el.className = 'point-bleu';
+
+  // Création du marker avec cet élément
+  const markerPointBleu = new mapboxgl.Marker(el)
+    .setLngLat([2.3522, 48.8566]) // Position initiale
+    .addTo(map);
+
+  // Fonction pour mettre à jour la position du marker
+  function updatePosition(lat, lon) {
+    markerPointBleu.setLngLat([lon, lat]);
+    // Optionnel : recentrer la carte sur la position
+    map.setCenter([lon, lat]);
+  }
+
+  // Suivi de la position avec géolocalisation
+  if ('geolocation' in navigator) {
+    navigator.geolocation.watchPosition((position) => {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+      updatePosition(lat, lon);
+    }, (error) => {
+      console.error('Erreur géolocalisation :', error);
+    }, {
+      enableHighAccuracy: true,
+      maximumAge: 10000,
+      timeout: 5000
+    });
+  } else {
+    alert('Géolocalisation non supportée par ce navigateur.');
+  }
 
   // Fonction pour centrer la carte sur l'utilisateur
 document.getElementById('locateBtn').addEventListener('click', () => {
@@ -435,7 +495,13 @@ document.getElementById('styleSelector').addEventListener('change', (e) => {
         runDiv.appendChild(miniMapDiv);
 
         runsList.appendChild(runDiv);
+// ** Ajout du bouton Partager **
+const shareButton = document.createElement('button');
+shareButton.textContent = 'Partager';
+shareButton.classList.add('share-btn');
+runDiv.appendChild(shareButton);
 
+runsList.appendChild(runDiv);
         // Initialiser mini map avec parcours
         const miniMap = new mapboxgl.Map({
           container: miniMapDiv,
@@ -454,9 +520,14 @@ document.getElementById('styleSelector').addEventListener('change', (e) => {
               "geometry": {
                 "type": "LineString",
                 "coordinates": run.positions.map(p => [p.longitude, p.latitude])
+
+                
               }
             }
+            
           });
+
+          
           miniMap.addLayer({
             "id": "route",
             "type": "line",
@@ -476,12 +547,172 @@ document.getElementById('styleSelector').addEventListener('change', (e) => {
             return bounds.extend([p.longitude, p.latitude]);
           }, new mapboxgl.LngLatBounds([run.positions[0].longitude, run.positions[0].latitude], [run.positions[0].longitude, run.positions[0].latitude]));
 
-          miniMap.fitBounds(bounds, {padding: 20});
+          miniMap.fitBounds(bounds, {padding: 20,
+    maxZoom: 16,
+    duration: 1000});
         });
       });
+
+      // Gestion du clic sur le bouton Partager
+shareButton.addEventListener('click', async () => {
+  // 1. Capturer l'image de la miniMap
+  const canvas = miniMap.getCanvas();
+  const imageDataUrl = canvas.toDataURL('image/png');
+
+  // 2. Générer le contenu GPX
+  const gpxContent = generateGPX(run);
+
+  // 3. Créer un blob et URL pour téléchargement GPX
+  const blob = new Blob([gpxContent], {type: 'application/gpx+xml'});
+  const gpxUrl = URL.createObjectURL(blob);
+
+  // 4. Afficher la popup de partage
+  showSharePopup({
+    image: imageDataUrl,
+    gpxLink: gpxUrl,
+    runInfo: run
+  });
+});
+
+// --- Fonctions à définir en dehors de ta boucle (par exemple dans ton script global) ---
+
+// Génération GPX à partir d'un parcours
+function generateGPX(run) {
+  const header = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="MonApp" xmlns="http://www.topografix.com/GPX/1/1">
+<trk>
+  <name>${run.name || 'Parcours'}</name>
+  <trkseg>`;
+  const footer = `
+  </trkseg>
+</trk>
+</gpx>`;
+
+  const points = run.positions.map(p => {
+    const time = p.timestamp ? `<time>${new Date(p.timestamp).toISOString()}</time>` : '';
+    return `<trkpt lat="${p.latitude}" lon="${p.longitude}">${time}</trkpt>`;
+  }).join('\n');
+
+  return header + points + footer;
+}
+
+// Popup partage
+function showSharePopup({image, gpxLink, runInfo}) {
+  const modal = document.createElement('div');
+  modal.style.position = 'fixed';
+  modal.style.top = '0'; 
+  modal.style.left = '0';
+  modal.style.width = '100%'; 
+  modal.style.height = '100%';
+  modal.style.backgroundColor = 'rgba(0,0,0,0.7)';
+  modal.style.display = 'flex';
+  modal.style.flexDirection = 'column';
+  modal.style.alignItems = 'center';
+  modal.style.justifyContent = 'center';
+  modal.style.zIndex = '9999';
+  modal.style.color = '#fff';
+  modal.style.padding = '20px';
+  modal.style.boxSizing = 'border-box';
+
+  modal.innerHTML = `
+    <h2>Partager ce parcours</h2>
+    <img src="${image}" style="max-width: 90vw; max-height: 50vh; border-radius: 8px; margin-bottom: 10px;"/>
+    <p>Distance : ${runInfo.distance} km</p>
+    <p>Durée : ${runInfo.duration}</p>
+    <p>Dénivelé : ${runInfo.elevation} m</p>
+    <a href="${gpxLink}" download="parcours.gpx" style="color: lightblue; margin: 10px;">Télécharger le GPX</a>
+    <button id="btnClose" style="margin-top: 15px; padding: 8px 15px; cursor: pointer;">Fermer</button>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal.querySelector('#btnClose').onclick = () => {
+    URL.revokeObjectURL(gpxLink);
+    document.body.removeChild(modal);
+  };
+}
     }
     historyModal.classList.add('active');
+    historyBtn.addEventListener('click', () => {
+  historyModal.classList.add('active'); // Affiche la modal
+  afficherHistorique(); // Fonction que tu peux créer pour afficher les données dans runsList
+});
+
+closeHistoryBtn.addEventListener('click', () => {
+  historyModal.classList.remove('active'); // Cache la modal
+});
+
+// Exemple simple pour afficher du contenu dans l'historique (à adapter)
+function afficherHistorique() {
+  runsList.innerHTML = '';
+
+  // Supposons que tu stockes tes courses dans localStorage ou dans une variable
+  const courses = JSON.parse(localStorage.getItem('courses')) || [];
+
+  if (courses.length === 0) {
+    runsList.innerHTML = '<p>Aucune course enregistrée.</p>';
+    return;
   }
+
+  courses.forEach(run => {
+    const div = document.createElement('div');
+    div.classList.add('run-item');
+    div.innerHTML = `
+      <div class="run-info">
+        <div>Date : ${new Date(run.date).toLocaleString()}</div>
+        <div>Distance : ${run.distance} km</div>
+        <div>Durée : ${run.duration}</div>
+        <div>Dénivelé : ${run.elevation} m</div>
+      </div>
+    `;
+    runsList.appendChild(div);
+  });
+}
+
+  }
+
+
+
+let wakeLock = null;
+
+// Fonction pour demander le Wake Lock
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('Wake Lock activé');
+
+      // Si le wake lock est libéré automatiquement (ex : perte de focus)
+      wakeLock.addEventListener('release', () => {
+        console.log('Wake Lock libéré');
+      });
+    } catch (err) {
+      console.error(`Erreur Wake Lock : ${err.name}, ${err.message}`);
+    }
+  } else {
+    console.warn('Wake Lock API non supportée sur ce navigateur.');
+  }
+}
+
+// Supprimer le message après 10 secondes
+setTimeout(() => {
+  const message = document.getElementById('wakeLockMessage');
+  if (message) {
+    message.remove();
+  }
+}, 10000); // 10 000 millisecondes = 10 secondes
+
+
+// Redemander le wake lock si l’onglet est rechargé ou redevient actif
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    requestWakeLock();
+  }
+});
+
+// Appelle la fonction au chargement de la page
+requestWakeLock();
 </script>
+
 </body>
 </html>
