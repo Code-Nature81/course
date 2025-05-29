@@ -687,9 +687,7 @@ closeHistoryBtn.addEventListener('click', () => {
 });
 
 
-// Exemple simple pour afficher du contenu dans l'historique (à adapter)
-function afficherHistorique() {
-  runsList.innerHTML = '';
+
 
   // Supposons que tu stockes tes courses dans localStorage ou dans une variable
   const courses = JSON.parse(localStorage.getItem('courses')) || [];
@@ -712,7 +710,7 @@ function afficherHistorique() {
     `;
     runsList.appendChild(div);
   });
-}
+
 
   
 
