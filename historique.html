@@ -60,16 +60,16 @@
   }
 
   function afficherHistorique(){
-    const histos = JSON.parse(localStorage.getItem('historiquesCourses') || '[]');
+    const historiques = JSON.parse(localStorage.getItem('historiquesCourses') || '[]');
     const ul = document.getElementById('listeCourses');
     ul.innerHTML = '';
 
-    if(histos.length === 0){
+    if(historiques.length === 0){
       ul.innerHTML = '<li>Aucun parcours enregistré</li>';
       return;
     }
 
-    histos.forEach(course => {
+    historiques.forEach(course => {
       const li = document.createElement('li');
       li.innerHTML = `
         <div class="date">${new Date(course.date).toLocaleString()}</div>
