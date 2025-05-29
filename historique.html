@@ -83,13 +83,12 @@
     cursor: pointer;
     box-shadow: 0 0 10px #0ff;
     font-weight: 700;
-    z-index: 1000;
+    z-index: 1000; /* Pour être au-dessus des autres éléments */
     max-width: 200px;
   }
   #btn-back:hover {
     background: #00aaff;
   }
-
   /* Scrollbar personnalisée */
   #courses-list::-webkit-scrollbar {
     width: 8px;
@@ -218,7 +217,7 @@
       if(typeof course.id === 'number') timestamp = course.id;
       else if(typeof course.id === 'string' && !isNaN(Number(course.id))) timestamp = Number(course.id);
       else timestamp = Date.now(); // fallback
-      
+
       const dateStr = new Date(timestamp).toLocaleString();
 
       const div = document.createElement('div');
@@ -227,7 +226,10 @@
       div.innerHTML = `
         <div class="course-header">
           <div>Course du ${dateStr}</div>
-          <button class="btn-share">Partager</button>
+          <div>
+            <button class="btn-share">Partager</button>
+            <button class="btn-delete" style="margin-left: 10px; background: #cc0000; border:none; color:#fff; padding:6px 12px; border-radius:12px; cursor:pointer;">Supprimer</button>
+          </div>
         </div>
         <div class="course-info">
           <div>Durée: ${formatTime(course.duration)}</div>
@@ -247,6 +249,19 @@
       // Bouton partage
       const shareBtn = div.querySelector('.btn-share');
       shareBtn.onclick = () => shareCourse(course);
+
+      // Bouton supprimer
+      const deleteBtn = div.querySelector('.btn-delete');
+      deleteBtn.onclick = () => {
+        if(confirm('Voulez-vous vraiment supprimer ce parcours ?')) {
+          // Supprime la course de la liste
+          courses = courses.filter(c => c.id !== course.id);
+          // Met à jour localStorage
+          localStorage.setItem('courses', JSON.stringify(courses));
+          // Rafraîchit la liste affichée
+          renderCourses();
+        }
+      };
     }
   }
 
@@ -254,19 +269,18 @@
     window.location.href = 'index.html';
   };
 
-  // Calcul km-effort par heure (distance ajustée / durée en heures)
-  function computeKmEffortPerHour(course) {
+  // Calcul simple de Km Effort par heure (distance en km * (1 + élévation en km) / durée en heures)
+  function computeKmEffort(course) {
     const distanceKm = course.distance / 1000;
-    const elevationFactor = 1 + ((course.elevationGain || 0) / 1000);
-    const durationHours = (course.duration || 1) / 3600000; // durée en ms convertie en heures
-    if (durationHours === 0) return 0; // éviter division par zéro
-    return (distanceKm * elevationFactor) / durationHours;
+    const elevationGainKm = (course.elevationGain || 0) / 1000;
+    const durationHours = (course.duration || 1) / (1000 * 3600); // évite div/0
+    return durationHours > 0 ? (distanceKm * (1 + elevationGainKm)) / durationHours : 0;
   }
 
-  // Met à jour kmEffort dans chaque course
+  // Avant de rendre la liste, on met à jour kmEffort dans chaque course
   courses = courses.map(course => {
     if (!course.kmEffort) {
-      course.kmEffort = computeKmEffortPerHour(course);
+      course.kmEffort = computeKmEffort(course);
     }
     return course;
   });
