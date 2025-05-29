@@ -71,24 +71,24 @@
   }
   /* Bouton retour */
   #btn-back {
-  position: fixed;
-  top: 5px;
-  left: 25%;
-  transform: translateX(-50%);
-  background: #0077cc;
-  border: none;
-  color: #0ff;
-  padding: 10px 20px;
-  border-radius: 40px;
-  cursor: pointer;
-  box-shadow: 0 0 10px #0ff;
-  font-weight: 700;
-  z-index: 1000; /* Pour être au-dessus des autres éléments */
-  max-width: 200px;
-}
-#btn-back:hover {
-  background: #00aaff;
-}
+    position: fixed;
+    top: 5px;
+    left: 25%;
+    transform: translateX(-50%);
+    background: #0077cc;
+    border: none;
+    color: #0ff;
+    padding: 10px 20px;
+    border-radius: 40px;
+    cursor: pointer;
+    box-shadow: 0 0 10px #0ff;
+    font-weight: 700;
+    z-index: 1000;
+    max-width: 200px;
+  }
+  #btn-back:hover {
+    background: #00aaff;
+  }
 
   /* Scrollbar personnalisée */
   #courses-list::-webkit-scrollbar {
@@ -234,7 +234,7 @@
           <div>Distance: ${(course.distance/1000).toFixed(2)} km</div>
           <div>Vitesse Moyenne: ${course.avgSpeed.toFixed(2)} km/h</div>
           <div>Dénivelé: ${Math.round(course.elevationGain)} m</div>
-          <div>Km Effort: ${course.kmEffort.toFixed(2)}</div>
+          <div>Km Effort / h: ${course.kmEffort.toFixed(2)}</div>
         </div>
         <div id="mini-map-${course.id}" class="mini-map"></div>
       `;
@@ -253,6 +253,23 @@
   btnBack.onclick = () => {
     window.location.href = 'index.html';
   };
+
+  // Calcul km-effort par heure (distance ajustée / durée en heures)
+  function computeKmEffortPerHour(course) {
+    const distanceKm = course.distance / 1000;
+    const elevationFactor = 1 + ((course.elevationGain || 0) / 1000);
+    const durationHours = (course.duration || 1) / 3600000; // durée en ms convertie en heures
+    if (durationHours === 0) return 0; // éviter division par zéro
+    return (distanceKm * elevationFactor) / durationHours;
+  }
+
+  // Met à jour kmEffort dans chaque course
+  courses = courses.map(course => {
+    if (!course.kmEffort) {
+      course.kmEffort = computeKmEffortPerHour(course);
+    }
+    return course;
+  });
 
   renderCourses();
 </script>

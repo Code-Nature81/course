@@ -157,9 +157,9 @@
   <div id="style-select-container">
     <select id="style-select" aria-label="Changer le fond de carte">
       <option value="mapbox/streets-v12">Streets</option>
-      <option value="mapbox/outdoors-v12">Outdoors</option>
+      <option value="mapbox/outdoors-v12"selected>Outdoors</option>
       <option value="mapbox/light-v11">Light</option>
-      <option value="mapbox/dark-v11" selected>Dark</option>
+      <option value="mapbox/dark-v11">Dark</option>
       <option value="mapbox/satellite-v9">Satellite</option>
       <option value="mapbox/satellite-streets-v12">Satellite Streets</option>
     </select>
@@ -174,7 +174,8 @@
     <div>Vitesse: <span id="speed">0.0</span> km/h</div>
     <div>Dénivelé: <span id="elevation">0</span> m</div>
     <div>Distance: <span id="distance">0.0</span> km</div>
-    <div>Km Effort: <span id="km-effort">0.0</span></div>
+    <div id="effort-container" class="info-box">KM-Effort/h: <span id="effort">0</span> km</div>
+
   </div>
 </div>
 
@@ -188,7 +189,7 @@
 
   const map = new mapboxgl.Map({
     container: 'map',
-    style: 'mapbox://styles/mapbox/dark-v11',
+    style: 'mapbox://styles/mapbox/outdoors-v12',
     center: [2.3522, 48.8566], // Paris par défaut
     zoom: 13,
     pitch: 0,
@@ -220,7 +221,7 @@
   const speedDisplay = document.getElementById('speed');
   const elevationDisplay = document.getElementById('elevation');
   const distanceDisplay = document.getElementById('distance');
-  const kmEffortDisplay = document.getElementById('km-effort');
+  const kmEffortDisplay = document.getElementById('effort');
   const styleSelect = document.getElementById('style-select');
 
   // Fonction format temps HH:MM:SS
@@ -256,7 +257,7 @@
         type: 'circle',
         source: positionCircleId,
         paint: {
-          'circle-radius': 12,
+          'circle-radius': 8,
           'circle-color': '#3399ff',
           'circle-opacity': 0.7,
           'circle-stroke-color': '#0077cc',
@@ -333,11 +334,18 @@
 
   // Fonction pour calculer km effort (Distance * vitesse moyenne en km/h / 10)
   // Ici approximé en temps réel en utilisant la vitesse instantanée et distance cumulée
-  function computeKmEffort(distanceKm, speedKmh) {
-    // Simplification
-    return (distanceKm * speedKmh) / 10;
-  }
+  function calculKmEffortHeure(distanceKm, denivelePositifM, tempsMinutes) {
+  if (tempsMinutes === 0) return 0;
+  const kmEffort = distanceKm + (denivelePositifM / 100);
+  return ((kmEffort * 60) / tempsMinutes).toFixed(2); // Résultat arrondi à 2 décimales
+}
 
+ function computeKmEffort(distanceKm, avgSpeedKmh) {
+    if (avgSpeedKmh === 0) return 0;
+    const effort = distanceKm + (totalElevationGain / 100);
+    const timeHours = (Date.now() - startTime) / 3600000;
+    return timeHours > 0 ? effort / timeHours : 0;
+  }
   // Géolocalisation classique
   function geolocate() {
     if(!navigator.geolocation) {
