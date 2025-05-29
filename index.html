@@ -409,26 +409,65 @@ document.getElementById('styleSelector').addEventListener('change', (e) => {
     startTime = Date.now();
     elapsedTimeInterval = setInterval(updateTime, 1000);
 
-    watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const coords = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          altitude: pos.coords.altitude || 0,
-          timestamp: pos.timestamp
-        };
-        positions.push(coords);
+    let lastCoords = null;
 
-        map.flyTo({center: [coords.longitude, coords.latitude], zoom: 15});
+watchId = navigator.geolocation.watchPosition(
+  (pos) => {
+    const coords = {
+      latitude: pos.coords.latitude,
+      longitude: pos.coords.longitude,
+      altitude: pos.coords.altitude || 0,
+      timestamp: pos.timestamp
+    };
 
-        updateStats();
-        drawPath();
-      },
-      (err) => {
-        console.error('Erreur géoloc :', err);
-      },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
-    );
+    if (lastCoords) {
+      const distance = getDistanceFromLatLonInMeters(lastCoords, coords);
+      const timeDiff = coords.timestamp - lastCoords.timestamp;
+
+      // Ignorer si distance > 50m en moins de 2 secondes (point aberrant)
+      if (distance > 50 && timeDiff < 2000) {
+        console.log('Point GPS ignoré : aberration détectée');
+        return;
+      }
+
+      // Ignorer si points trop proches en temps (< 500ms)
+      if (timeDiff < 500) {
+        return;
+      }
+    }
+
+    positions.push(coords);
+    lastCoords = coords;
+
+    map.flyTo({center: [coords.longitude, coords.latitude], zoom: 15});
+
+    updateStats();
+    drawPath();
+  },
+  (err) => {
+    console.error('Erreur géoloc :', err);
+  },
+  { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+);
+
+// Fonction pour calculer la distance entre 2 coordonnées en mètres
+function getDistanceFromLatLonInMeters(coord1, coord2) {
+  const R = 6371000; // Rayon Terre en mètres
+  const dLat = deg2rad(coord2.latitude - coord1.latitude);
+  const dLon = deg2rad(coord2.longitude - coord1.longitude);
+  const a =
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(deg2rad(coord1.latitude)) * Math.cos(deg2rad(coord2.latitude)) *
+    Math.sin(dLon/2) * Math.sin(dLon/2)
+  ;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function deg2rad(deg) {
+  return deg * (Math.PI/180);
+}
+
   }
 
   function stopRun() {
@@ -466,123 +505,127 @@ document.getElementById('styleSelector').addEventListener('change', (e) => {
 
   // Afficher l'historique
   function showHistory() {
-    runsList.innerHTML = '';
-    let runs = JSON.parse(localStorage.getItem('runs') || '[]');
-    if (runs.length === 0) {
-      runsList.innerHTML = '<p>Aucune course enregistrée.</p>';
-    } else {
-      // Trier par date décroissante
-      runs.sort((a,b) => b.id - a.id);
-      runs.forEach(run => {
-        const runDiv = document.createElement('div');
-        runDiv.classList.add('run-item');
+  runsList.innerHTML = '';
+  let runs = JSON.parse(localStorage.getItem('runs') || '[]');
 
-        // Infos textuelles
-        const infoDiv = document.createElement('div');
-        infoDiv.classList.add('run-info');
-        infoDiv.innerHTML = `
-          <div><strong>Date :</strong> ${new Date(run.date).toLocaleString()}</div>
-          <div><strong>Distance :</strong> ${run.distance.toFixed(2)} km</div>
-          <div><strong>Dénivelé :</strong> ${Math.round(run.elevation)} m</div>
-          <div><strong>Km-effort :</strong> ${run.kmEffort.toFixed(2)}</div>
-          <div><strong>Durée :</strong> ${formatTime(run.durationMs)}</div>
-        `;
+  if (runs.length === 0) {
+    runsList.innerHTML = '<p>Aucune course enregistrée.</p>';
+    return;
+  }
 
-        // Mini carte Mapbox
-        const miniMapDiv = document.createElement('div');
-        miniMapDiv.classList.add('mini-map');
-        runDiv.appendChild(infoDiv);
-        runDiv.appendChild(miniMapDiv);
+  // Trier par date décroissante
+  runs.sort((a, b) => b.id - a.id);
 
-        runsList.appendChild(runDiv);
-// ** Ajout du bouton Partager **
-const shareButton = document.createElement('button');
-shareButton.textContent = 'Partager';
-shareButton.classList.add('share-btn');
-runDiv.appendChild(shareButton);
+  runs.forEach(run => {
+    const runDiv = document.createElement('div');
+    runDiv.classList.add('run-item');
 
-runsList.appendChild(runDiv);
-        // Initialiser mini map avec parcours
-        const miniMap = new mapboxgl.Map({
-          container: miniMapDiv,
-          style: 'mapbox://styles/mapbox/outdoors-v12',
-          interactive: false,
-          center: [run.positions[0].longitude, run.positions[0].latitude],
-          zoom: 13,
-          attributionControl: false
-        });
+    // Infos textuelles
+    const infoDiv = document.createElement('div');
+    infoDiv.classList.add('run-info');
+    infoDiv.innerHTML = `
+      <div><strong>Date :</strong> ${new Date(run.date).toLocaleString()}</div>
+      <div><strong>Distance :</strong> ${run.distance.toFixed(2)} km</div>
+      <div><strong>Dénivelé :</strong> ${Math.round(run.elevation)} m</div>
+      <div><strong>Km-effort :</strong> ${run.kmEffort.toFixed(2)}</div>
+      <div><strong>Durée :</strong> ${formatTime(run.durationMs)}</div>
+    `;
 
-        miniMap.on('load', () => {
-          miniMap.addSource('route', {
-            "type": "geojson",
-            "data": {
-              "type": "Feature",
-              "geometry": {
-                "type": "LineString",
-                "coordinates": run.positions.map(p => [p.longitude, p.latitude])
+    // Mini carte Mapbox
+    const miniMapDiv = document.createElement('div');
+    miniMapDiv.classList.add('mini-map');
 
-                
-              }
-            }
-            
-          });
+    runDiv.appendChild(infoDiv);
+    runDiv.appendChild(miniMapDiv);
 
-          
-          miniMap.addLayer({
-            "id": "route",
-            "type": "line",
-            "source": "route",
-            "layout": {
-              "line-join": "round",
-              "line-cap": "round"
-            },
-            "paint": {
-              "line-color": "#38a1db",
-              "line-width": 4
-            }
-          });
+    // Bouton Partager
+    const shareButton = document.createElement('button');
+    shareButton.textContent = 'Partager';
+    shareButton.classList.add('share-btn');
+    runDiv.appendChild(shareButton);
 
-          // Ajuster la vue au tracé
-          const bounds = run.positions.reduce((bounds, p) => {
-            return bounds.extend([p.longitude, p.latitude]);
-          }, new mapboxgl.LngLatBounds([run.positions[0].longitude, run.positions[0].latitude], [run.positions[0].longitude, run.positions[0].latitude]));
+    runsList.appendChild(runDiv);
 
-          miniMap.fitBounds(bounds, {padding: 20,
-    maxZoom: 16,
-    duration: 1000});
-        });
+    // Initialiser mini map avec parcours
+    const miniMap = new mapboxgl.Map({
+      container: miniMapDiv,
+      style: 'mapbox://styles/mapbox/outdoors-v12',
+      interactive: false,
+      center: [run.positions[0].longitude, run.positions[0].latitude],
+      zoom: 13,
+      attributionControl: false
+    });
+
+    miniMap.on('load', () => {
+      miniMap.addSource('route', {
+        "type": "geojson",
+        "data": {
+          "type": "Feature",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": run.positions.map(p => [p.longitude, p.latitude])
+          }
+        }
       });
 
-      // Gestion du clic sur le bouton Partager
-shareButton.addEventListener('click', async () => {
-  // 1. Capturer l'image de la miniMap
-  const canvas = miniMap.getCanvas();
-  const imageDataUrl = canvas.toDataURL('image/png');
+      miniMap.addLayer({
+        "id": "route",
+        "type": "line",
+        "source": "route",
+        "layout": {
+          "line-join": "round",
+          "line-cap": "round"
+        },
+        "paint": {
+          "line-color": "#38a1db",
+          "line-width": 4
+        }
+      });
 
-  // 2. Générer le contenu GPX
-  const gpxContent = generateGPX(run);
+      // Ajuster la vue au tracé
+      const bounds = run.positions.reduce((bounds, p) => {
+        return bounds.extend([p.longitude, p.latitude]);
+      }, new mapboxgl.LngLatBounds([run.positions[0].longitude, run.positions[0].latitude], [run.positions[0].longitude, run.positions[0].latitude]));
 
-  // 3. Créer un blob et URL pour téléchargement GPX
-  const blob = new Blob([gpxContent], {type: 'application/gpx+xml'});
-  const gpxUrl = URL.createObjectURL(blob);
+      miniMap.fitBounds(bounds, { padding: 20, maxZoom: 16, duration: 1000 });
+    });
 
-  // 4. Afficher la popup de partage
-  showSharePopup({
-    image: imageDataUrl,
-    gpxLink: gpxUrl,
-    runInfo: run
+    // Gestion clic bouton Partager (attention au scope)
+    shareButton.addEventListener('click', () => {
+      // Capture de la miniMap
+      const canvas = miniMap.getCanvas();
+      const imageDataUrl = canvas.toDataURL('image/png');
+
+      // Générer GPX
+      const gpxContent = generateGPX(run);
+
+      // Créer blob et URL pour GPX
+      const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
+      const gpxUrl = URL.createObjectURL(blob);
+
+      // Afficher popup partage
+      showSharePopup({
+        image: imageDataUrl,
+        gpxLink: gpxUrl,
+        runInfo: run
+      });
+    });
   });
-});
+}
+
+
 
 // --- Fonctions à définir en dehors de ta boucle (par exemple dans ton script global) ---
 
 // Génération GPX à partir d'un parcours
+// Génération GPX
 function generateGPX(run) {
   const header = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="MonApp" xmlns="http://www.topografix.com/GPX/1/1">
 <trk>
   <name>${run.name || 'Parcours'}</name>
   <trkseg>`;
+  
   const footer = `
   </trkseg>
 </trk>
@@ -597,12 +640,12 @@ function generateGPX(run) {
 }
 
 // Popup partage
-function showSharePopup({image, gpxLink, runInfo}) {
+function showSharePopup({ image, gpxLink, runInfo }) {
   const modal = document.createElement('div');
   modal.style.position = 'fixed';
-  modal.style.top = '0'; 
+  modal.style.top = '0';
   modal.style.left = '0';
-  modal.style.width = '100%'; 
+  modal.style.width = '100%';
   modal.style.height = '100%';
   modal.style.backgroundColor = 'rgba(0,0,0,0.7)';
   modal.style.display = 'flex';
@@ -617,9 +660,9 @@ function showSharePopup({image, gpxLink, runInfo}) {
   modal.innerHTML = `
     <h2>Partager ce parcours</h2>
     <img src="${image}" style="max-width: 90vw; max-height: 50vh; border-radius: 8px; margin-bottom: 10px;"/>
-    <p>Distance : ${runInfo.distance} km</p>
-    <p>Durée : ${runInfo.duration}</p>
-    <p>Dénivelé : ${runInfo.elevation} m</p>
+    <p>Distance : ${runInfo.distance.toFixed(2)} km</p>
+    <p>Durée : ${formatTime(runInfo.durationMs)}</p>
+    <p>Dénivelé : ${Math.round(runInfo.elevation)} m</p>
     <a href="${gpxLink}" download="parcours.gpx" style="color: lightblue; margin: 10px;">Télécharger le GPX</a>
     <button id="btnClose" style="margin-top: 15px; padding: 8px 15px; cursor: pointer;">Fermer</button>
   `;
@@ -631,16 +674,18 @@ function showSharePopup({image, gpxLink, runInfo}) {
     document.body.removeChild(modal);
   };
 }
-    }
-    historyModal.classList.add('active');
+
+    
     historyBtn.addEventListener('click', () => {
-  historyModal.classList.add('active'); // Affiche la modal
-  afficherHistorique(); // Fonction que tu peux créer pour afficher les données dans runsList
+  showHistory();            // Affiche la liste des parcours
+  historyModal.classList.add('active');  // Ouvre la modal
 });
 
 closeHistoryBtn.addEventListener('click', () => {
-  historyModal.classList.remove('active'); // Cache la modal
+  historyModal.classList.remove('active'); // Ferme la modal
+  runsList.innerHTML = '';                   // Vide la liste pour nettoyer
 });
+
 
 // Exemple simple pour afficher du contenu dans l'historique (à adapter)
 function afficherHistorique() {
@@ -669,7 +714,7 @@ function afficherHistorique() {
   });
 }
 
-  }
+  
 
 
 
